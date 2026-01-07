@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>冯锌绫专属圣诞树</title>
+    <!-- Customize: Replace with your own name/title -->
+    <title>我的专属圣诞树</title>
     <style>
         body { margin: 0; padding: 0; overflow: hidden; background: #050505; font-family: 'Segoe UI', sans-serif; color: #ffb6c1; }
         #canvas-container { width: 100vw; height: 100vh; }
@@ -55,13 +56,15 @@
 <body>
 
     <div id="loading-screen">
-        <div id="loading-text">正在加载冯锌绫的粒子世界...</div>
+        <!-- Customize: Replace with your own name/text -->
+        <div id="loading-text">正在加载粒子世界...</div>
     </div>
 
     <div id="toast" class="toast"></div>
 
     <div class="overlay">
-        <h1>冯锌绫专属圣诞树</h1>
+        <!-- Customize: Replace with your own name/title -->
+        <h1>我的专属圣诞树</h1>
     </div>
 
     <video id="video-feed" autoplay playsinline></video>
@@ -95,7 +98,8 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'fxl-pink-xmas';
+        // Customize: Replace 'my-pink-xmas' with your own unique app identifier
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'my-pink-xmas';
 
         let scene, camera, renderer, treeGroup, user;
         let treeParticles, treeOrigPos, treeCurrPos, treeVels, treeScatterPos;
