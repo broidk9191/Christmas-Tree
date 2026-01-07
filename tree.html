@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Customize: Replace with your own name/title -->
-    <title>我的专属圣诞树</title>
+    <title>Pink Christmas Tree</title>
     <style>
         body { margin: 0; padding: 0; overflow: hidden; background: #050505; font-family: 'Segoe UI', sans-serif; color: #ffb6c1; }
         #canvas-container { width: 100vw; height: 100vh; }
@@ -30,13 +29,6 @@
         #video-feed {
             position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none;
         }
-
-        #modal {
-            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(15, 15, 15, 0.98); padding: 40px; border-radius: 24px;
-            border: 1px solid #ffb6c1; display: none; z-index: 1000; text-align: center;
-            box-shadow: 0 0 50px rgba(0,0,0,1);
-        }
         
         #loading-screen {
             position: fixed; inset: 0; background: #050505; z-index: 9999;
@@ -51,35 +43,31 @@
             z-index: 10000; display: none; animation: fadeIn 0.3s;
         }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+
+        .clear-btn { background: rgba(255, 0, 0, 0.1); border-color: rgba(255, 182, 193, 0.3); font-size: 0.7rem; opacity: 0.5; }
+        .clear-btn:hover { background: rgba(255, 0, 0, 0.3); opacity: 1; }
     </style>
 </head>
 <body>
 
     <div id="loading-screen">
-        <!-- Customize: Replace with your own name/text -->
-        <div id="loading-text">正在加载粒子世界...</div>
+        <div id="loading-text">Loading...</div>
     </div>
 
     <div id="toast" class="toast"></div>
 
     <div class="overlay">
-        <!-- Customize: Replace with your own name/title -->
-        <h1>我的专属圣诞树</h1>
+        <h1>Pink Christmas Tree</h1>
+        <p id="memory-count">Favorite Memories：0 </p>
     </div>
 
     <video id="video-feed" autoplay playsinline></video>
 
     <div class="controls">
-        <label for="photo-input" class="btn" id="upload-label">上传记忆</label>
-        <input type="file" id="photo-input" accept="image/*,.heic,.heif">
-        <button class="btn" id="share-btn">保存记忆</button>
-    </div>
-
-    <div id="modal">
-        <h2 style="color: #ffb6c1; letter-spacing: 2px;">专属纪念碑已存至云端</h2>
-        <p id="share-url" style="color: #fff; margin: 25px 0; word-break: break-all; opacity: 0.7; font-size: 0.9rem;"></p>
-        <button class="btn" onclick="copyLink()">复制链接</button>
-        <button class="btn" style="border-color: #444;" onclick="closeModal()">关闭</button>
+        <label for="photo-input" class="btn" id="upload-label">Add memories(pictures)</label>
+        <input type="file" id="photo-input" accept="image/*,.heic,.heif" multiple>
+        <button class="btn clear-btn" onclick="clearMemories()">Clear memories</button>
+        <div class="btn" style="cursor: default; opacity: 0.6; pointer-events: none;">Control：Open you palm / pinch to rotate</div>
     </div>
 
     <div id="canvas-container"></div>
@@ -89,19 +77,56 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    <script>
+        /** * INDEXEDDB STORAGE LOGIC 
+         * To persist photos locally without a server.
+         */
+        const DB_NAME = "XmasMemoryDB";
+        const STORE_NAME = "Photos";
+        let db;
 
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        // Customize: Replace 'my-pink-xmas' with your own unique app identifier
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'my-pink-xmas';
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, 1);
+                request.onupgradeneeded = (e) => {
+                    e.target.result.createObjectStore(STORE_NAME, { autoIncrement: true });
+                };
+                request.onsuccess = (e) => {
+                    db = e.target.result;
+                    resolve();
+                };
+                request.onerror = (e) => reject(e);
+            });
+        }
 
-        let scene, camera, renderer, treeGroup, user;
+        async function savePhoto(blob) {
+            return new Promise((resolve) => {
+                const tx = db.transaction(STORE_NAME, "readwrite");
+                const store = tx.objectStore(STORE_NAME);
+                store.add(blob);
+                tx.oncomplete = () => resolve();
+            });
+        }
+
+        async function getAllPhotos() {
+            return new Promise((resolve) => {
+                const tx = db.transaction(STORE_NAME, "readonly");
+                const store = tx.objectStore(STORE_NAME);
+                const request = store.getAll();
+                request.onsuccess = () => resolve(request.result);
+            });
+        }
+
+        async function clearMemories() {
+            if(confirm("确定要删除所有本地保存的记忆吗？")) {
+                const tx = db.transaction(STORE_NAME, "readwrite");
+                tx.objectStore(STORE_NAME).clear();
+                tx.oncomplete = () => window.location.reload();
+            }
+        }
+
+        /** THREE.JS & HANDS LOGIC **/
+        let scene, camera, renderer, treeGroup;
         let treeParticles, treeOrigPos, treeCurrPos, treeVels, treeScatterPos;
         let starParticles, starOrigPos, starCurrPos, starVels, starScatterPos;
         let starLight, floorParticles;
@@ -116,20 +141,21 @@
         let treeRotationVel = 0.004;
 
         async function init() {
-            const initAuth = async () => {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            };
-            await initAuth();
-            onAuthStateChanged(auth, (u) => { user = u; if (user) checkUrlForSharedData(); });
-
+            await initDB();
             setupThree();
             setupHands();
             setupEvents();
-            document.getElementById('loading-screen').style.display = 'none';
+            
+            // Load existing memories
+            const saved = await getAllPhotos();
+            for (let blob of saved) {
+                const url = URL.createObjectURL(blob);
+                addImageToScene(url);
+            }
+
+            const loader = document.getElementById('loading-screen');
+            loader.style.opacity = '0';
+            setTimeout(() => loader.style.display = 'none', 500);
         }
 
         function showToast(msg) {
@@ -143,7 +169,7 @@
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.position.set(0, 2.5, 9);
 
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             document.getElementById('canvas-container').appendChild(renderer.domElement);
@@ -151,6 +177,7 @@
             treeGroup = new THREE.Group();
             scene.add(treeGroup);
 
+            // Particle Setup (Same as original design)
             const baseTreeCount = 35000;
             const ribbonCount = 8000;
             const bellCount = 1500;
@@ -320,24 +347,34 @@
                     isHandOpen = opened >= 3;
                 }
             });
-            new Camera(videoElement, { onFrame: async () => { await hands.send({ image: videoElement }); }, width: 640, height: 480 }).start();
+            new Camera(videoElement, { onFrame: async () => { await hands.send({ image: videoElement }); }, width: 640, height: 480 }).start()
+                .catch(() => console.log("Camera access denied."));
         }
 
         function setupEvents() {
             const input = document.getElementById('photo-input');
             input.onchange = async (e) => {
-                let file = e.target.files[0]; if (!file) return;
-                try {
-                    if (file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif')) {
-                        const blob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.7 });
-                        file = new File([Array.isArray(blob) ? blob[0] : blob], "mem.jpg", { type: "image/jpeg" });
-                    }
-                    const r = new FileReader();
-                    r.onload = (ev) => addImageToScene(ev.target.result);
-                    r.readAsDataURL(file);
-                } catch (err) { showToast("加载出错"); }
+                const files = Array.from(e.target.files);
+                if (files.length === 0) return;
+
+                for (let file of files) {
+                    try {
+                        let finalFile = file;
+                        if (file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif')) {
+                            const blob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.7 });
+                            finalFile = new File([Array.isArray(blob) ? blob[0] : blob], "mem.jpg", { type: "image/jpeg" });
+                        }
+                        
+                        // Save to IndexedDB
+                        await savePhoto(finalFile);
+                        
+                        // Add to scene
+                        const url = URL.createObjectURL(finalFile);
+                        addImageToScene(url);
+                    } catch (err) { console.error("Error loading file", err); }
+                }
+                showToast(`已成功保存 ${files.length} 张记忆到本地`);
             };
-            document.getElementById('share-btn').onclick = shareScene;
         }
 
         function addImageToScene(url) {
@@ -349,7 +386,8 @@
                 mesh.scale.set(0.01, 0.01, 0.01);
                 mesh.lookAt(0, mesh.position.y, 0);
                 treeGroup.add(mesh);
-                photoMeshes.push({ mesh, data: url });
+                photoMeshes.push(mesh);
+                document.getElementById('memory-count').innerText = `本地记忆：${photoMeshes.length} 张`;
             });
         }
 
@@ -405,48 +443,25 @@
                 teddyBear.traverse(n => { if(n.isMesh) n.material.opacity += (physOp - n.material.opacity) * 0.1; });
                 teddyBear.position.y += ((-1.85 + (isHandOpen ? 0.3 : 0)) - teddyBear.position.y) * 0.1;
             }
-            photoMeshes.forEach(p => {
+            photoMeshes.forEach(mesh => {
                 if(isHandOpen) {
-                    p.mesh.scale.lerp(new THREE.Vector3(2.2, 2.2, 2.2), 0.06);
-                    p.mesh.material.opacity += (1.0 - p.mesh.material.opacity) * 0.08;
+                    mesh.scale.lerp(new THREE.Vector3(2.2, 2.2, 2.2), 0.06);
+                    mesh.material.opacity += (1.0 - mesh.material.opacity) * 0.08;
                 } else {
-                    p.mesh.scale.lerp(new THREE.Vector3(0.01, 0.01, 0.01), 0.1);
-                    p.mesh.material.opacity += (0.0 - p.mesh.material.opacity) * 0.12;
-                    p.mesh.lookAt(0, p.mesh.position.y, 0);
+                    mesh.scale.lerp(new THREE.Vector3(0.01, 0.01, 0.01), 0.1);
+                    mesh.material.opacity += (0.0 - mesh.material.opacity) * 0.12;
+                    mesh.lookAt(0, mesh.position.y, 0);
                 }
             });
             starLight.intensity = (isHandOpen ? 1.5 : 8) + Math.sin(t*4) * 3;
             renderer.render(scene, camera);
         }
 
-        async function shareScene() {
-            if (!user) return;
-            try {
-                showToast("同步云端...");
-                const photos = photoMeshes.map(p => ({ data: p.data }));
-                const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shrines'), { photos, timestamp: Date.now(), owner: user.uid });
-                document.getElementById('share-url').innerText = window.location.origin + window.location.pathname + "?id=" + docRef.id;
-                document.getElementById('modal').style.display = 'block';
-            } catch (e) { showToast("同步失败"); }
-        }
-
-        async function checkUrlForSharedData() {
-            const id = new URLSearchParams(window.location.search).get('id');
-            if (id && user) {
-                try {
-                    const s = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shrines', id));
-                    if (s.exists()) s.data().photos.forEach(p => addImageToScene(p.data));
-                } catch (e) {}
-            }
-        }
-
-        window.copyLink = () => {
-            const u = document.getElementById('share-url').innerText;
-            const el = document.createElement('textarea'); el.value = u; document.body.appendChild(el);
-            el.select(); document.execCommand('copy'); document.body.removeChild(el);
-            showToast("已复制专属链接!");
-        };
-        window.closeModal = () => document.getElementById('modal').style.display = 'none';
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
 
         init();
     </script>
